@@ -1,7 +1,7 @@
 include('CPK.lua')
 
 local StringBuilder = CPK.Util.StringBuilder
-local AsPercentage = CPK.Util.AsPercentage
+local AsPercentage = CPK.Misc.AsPercentage
 
 local _lua_type = type
 local _lua_math_floor = math.floor

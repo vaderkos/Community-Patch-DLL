@@ -2,6 +2,7 @@ include('CPK.lua')
 
 local StringBuilder = CPK.Util.StringBuilder
 local AsPercentage = CPK.Misc.AsPercentage
+local Memoize1 = CPK.Cache.Memoize1
 
 local _lua_type = type
 local _lua_math_floor = math.floor
@@ -594,41 +595,19 @@ local function BuildTechHelpContent(tech)
 	return str
 end
 
---- Returns a weak-value memoized version of a function.
---- Memoization key is based on the first argument.
---- Caches results by key using weak references (values can be garbage-collected).
---- If the key is not in the cache, calls `fn(key, ...)` and stores the result.
----
---- @generic Fn : (fun(key: any, ...: any): any)
---- @return Fn
-local function WeakMemoize1(fn)
-	local cache = _lua_setmetatable({}, { __mode = 'v' })
-
-	return function(key, ...)
-		local val = cache[key]
-
-		if not val then
-			val = fn(key, ...)
-			cache[key] = val
-		end
-
-		return val
-	end
-end
-
-local GetTechById = WeakMemoize1(function(techId)
+local GetTechById = Memoize1(function(techId)
 	return GameInfo.Technologies[techId]
 end)
 
-local GetTechNameById = WeakMemoize1(function(techId)
+local GetTechNameById = Memoize1(function(techId)
 	return _civ_locale_toupper(L(GetTechById(techId).Description))
 end)
 
-GetShortHelpTextForTech = WeakMemoize1(function(techId)
+GetShortHelpTextForTech = Memoize1(function(techId)
 	return BuildTechHelpContent(GetTechById(techId))
 end)
 
-local GetHelpForCompleteTech = WeakMemoize1(function(techId)
+local GetHelpForCompleteTech = Memoize1(function(techId)
 	local help = GetShortHelpTextForTech(techId)
 
 	return GetTechNameById(techId)

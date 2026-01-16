@@ -1622,21 +1622,21 @@ function GiAsm.Assemble()
 		local tbl = lua_setmetatable({}, tbl_meta)
 		Info('Returning tbl')
 
-		GI_DAT = {
-			tbl_size = tbl_size,
-			tbl_rows = tbl_rows,
-			tbl_cols = tbl_cols,
-			tbl_nkey = tbl_nkey,
-			tbl_skey = tbl_skey,
-			tbl_nadj = tbl_nadj,
-			col_stats = col_stats,
-			row_stride = row_stride,
-			col_plans = col_plans,
-			tbl_nmap = tbl_nmap,
-			tbl_smap = tbl_smap,
-			tbl_data = tbl_data,
-			col_funs = col_funs,
-		}
+		-- GI_DAT = {
+		-- 	tbl_size = tbl_size,
+		-- 	tbl_rows = tbl_rows,
+		-- 	tbl_cols = tbl_cols,
+		-- 	tbl_nkey = tbl_nkey,
+		-- 	tbl_skey = tbl_skey,
+		-- 	tbl_nadj = tbl_nadj,
+		-- 	col_stats = col_stats,
+		-- 	row_stride = row_stride,
+		-- 	col_plans = col_plans,
+		-- 	tbl_nmap = tbl_nmap,
+		-- 	tbl_smap = tbl_smap,
+		-- 	tbl_data = tbl_data,
+		-- 	col_funs = col_funs,
+		-- }
 
 		return tbl
 	end
@@ -1653,7 +1653,7 @@ function GiAsm.Assemble()
 		gi[tbl_name] = gi_asm_build_tbl(tbl_name)
 	end
 
-	GI_TBL = gi_asm_build_tbl('Specialists')
+	-- GI_TBL = gi_asm_build_tbl('Specialists')
 
 	lua_setmetatable(gi, {
 		__newindex = function()

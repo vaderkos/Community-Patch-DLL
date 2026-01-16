@@ -1,4 +1,89 @@
 function TEST()
+	--- @return table<string, { notnull: boolean, unique: boolean }>
+	local function check_type_constraints()
+		local problems = {}
+
+		local pragma_tbl_info = 'PRAGMA table_info(`%s`)'
+		local pragma_idx_list = 'PRAGMA index_list(`%s`)'
+		local pragma_idx_info = 'PRAGMA index_info(`%s`)'
+
+		local function qry(tmp, ...)
+			return DB.Query(string.format(tmp, ...))
+		end
+
+		for r in DB.Query([[
+		SELECT name FROM sqlite_master
+		WHERE type = 'table' AND name NOT LIKE 'sqlite%'
+	]]) do
+			local tbl_name = r.name
+
+			local has_id = false
+			local type_col = nil
+
+			-- 1. read columns
+			for row in qry(pragma_tbl_info, tbl_name) do
+				if row.name == 'ID' then
+					has_id = true
+				elseif row.name == 'Type' then
+					type_col = {
+						notnull = row.notnull == 1,
+						pk = row.pk > 0,
+						unique = false,
+					}
+				end
+			end
+
+			-- we only care about tables with BOTH ID and Type
+			if has_id and type_col then
+				-- PK already implies UNIQUE + NOT NULL
+				if type_col.pk then
+					type_col.unique = true
+					type_col.notnull = true
+				else
+					-- 2. check unique indexes
+					for idx in qry(pragma_idx_list, tbl_name) do
+						if idx.unique == 1 then
+							local count = 0
+							local colname = nil
+
+							for info in qry(pragma_idx_info, idx.name) do
+								count = count + 1
+								colname = info.name
+							end
+
+							if count == 1 and colname == 'Type' then
+								type_col.unique = true
+								break
+							end
+						end
+					end
+				end
+
+				if not type_col.notnull or not type_col.unique then
+					problems[tbl_name] = {
+						notnull = type_col.notnull,
+						unique = type_col.unique,
+					}
+				end
+			end
+		end
+
+		return problems
+	end
+
+	local problems = check_type_constraints()
+
+	for tbl, info in pairs(problems) do
+		print(
+			string.format(
+				'Table %s: Type column invalid (NOT NULL=%s, UNIQUE=%s)',
+				tbl,
+				tostring(info.notnull),
+				tostring(info.unique)
+			)
+		)
+	end
+
 	local collectgarbage = collectgarbage;
 	local pairs = pairs;
 	local unpack = unpack;

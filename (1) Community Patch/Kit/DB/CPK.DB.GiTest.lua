@@ -8,51 +8,33 @@ local function gc()
 	collectgarbage('collect')
 end
 
+local GiAsm = CPK.DB.GiAsm
+
 --- Measures Lua heap usage (in MB) of Gi after loading given tables
 --- @param tables string[] # List of GameInfo table names
 --- @return number # Memory usage in megabytes
 local function MeasureGiMemoryMB(tables)
-	local Gi = CPK.DB.Gi
+	-- gc()
 
-	-- Step 1: clean baseline
-	gc()
+	-- GiAsm.Assemble()
 
-	-- Step 2: force Gi initialization
-	for i = 1, #tables do
-		local name = tables[i]
-		-- Access triggers creation + caching
-		local _ = Gi[name]
-	end
+	-- gc()
 
-	-- Clear holder
-	for i = 1, #tables do
-		local name = tables[i]
-		-- Access triggers creation + caching
-		Gi[name] = nil
-	end
 
-	gc()
 
-	local before_kb = collectgarbage('count')
+	-- gc()
 
-	-- Recreate holder
-	for i = 1, #tables do
-		local name = tables[i]
-		-- Access triggers creation + caching
-		local _ = Gi[name]
+	-- local before_kb = collectgarbage('count')
 
-		if Gi == GameInfo then
-			for r in Gi[name]() do end
-		end
-	end
+	-- local Gi = GiAsm.Assemble()
+	-- GiAsm = nil
+	-- -- Step 3: stabilize heap
+	-- gc()
 
-	-- Step 3: stabilize heap
-	gc()
-
-	local after_kb = collectgarbage('count')
-
-	-- Step 4: delta in MB
-	return (after_kb - before_kb) / 1024
+	-- local after_kb = collectgarbage('count')
+	-- Gi = nil
+	-- -- Step 4: delta in MB
+	-- return (after_kb - before_kb) / 1024
 end
 
 --- Benchmarks a function with timing + heap statistics
@@ -144,7 +126,7 @@ local function PrintBenchmark(fn, title, iterations)
 end
 
 CPK.DB.GiTest = function()
-	local Gi = CPK.DB.Gi
+	local GiAsm = CPK.DB.GiAsm
 	local tbl_names = {}
 
 	local sql = [[
@@ -157,6 +139,8 @@ CPK.DB.GiTest = function()
 	end
 
 	print(#tbl_names .. ' Gi tables used mb .. ', MeasureGiMemoryMB(tbl_names))
+
+	local Gi = GiAsm.Assemble()
 
 	for _, name in next, tbl_names do
 		local newIter = Gi[name]()
@@ -186,13 +170,12 @@ CPK.DB.GiTest = function()
 	gc()
 
 	local GameInfo = GameInfo
-	local Gi = Gi
 
 	print('==== Simple Iterations ====')
 
-	PrintBenchmark(function()
-		for row in GameInfo.Policies() do end
-	end, 'GameInfo.Policies()')
+	-- PrintBenchmark(function()
+	-- 	for row in GameInfo.Policies() do end
+	-- end, 'GameInfo.Policies()')
 
 	PrintBenchmark(function()
 		for row in Gi.Policies() do end
@@ -200,9 +183,9 @@ CPK.DB.GiTest = function()
 
 	print('==== SQL Filters ====')
 
-	PrintBenchmark(function()
-		for row in GameInfo.Policies('PortraitIndex > 50') do end
-	end, "GameInfo.Policies(' PortraitIndex > 50 ')")
+	-- PrintBenchmark(function()
+	-- 	for row in GameInfo.Policies('PortraitIndex > 50') do end
+	-- end, "GameInfo.Policies(' PortraitIndex > 50 ')")
 
 	PrintBenchmark(function()
 		for row in Gi.Policies('PortraitIndex > 50') do end
@@ -214,9 +197,9 @@ CPK.DB.GiTest = function()
 
 	print('==== Table Filters ====')
 
-	PrintBenchmark(function()
-		for row in GameInfo.Policies({ CultureCost = 10 }) do end
-	end, "GameInfo.Policies({ CultureCost = 10 })")
+	-- PrintBenchmark(function()
+	-- 	for row in GameInfo.Policies({ CultureCost = 10 }) do end
+	-- end, "GameInfo.Policies({ CultureCost = 10 })")
 
 	PrintBenchmark(function()
 		for row in Gi.Policies({ CultureCost = 10 }) do end
@@ -224,14 +207,15 @@ CPK.DB.GiTest = function()
 
 	print('==== Row access ====')
 
-	PrintBenchmark(function()
-		local p = GameInfo.Policies.POLICY_LIBERTY
-		local _ = p.Description
-		_ = p.ID
-		_ = p.FreeBuildingOnConquest
-		_ = p.GridX
-		_ = p.GridY
-	end, "GameInfo column access")
+	-- PrintBenchmark(function()
+	-- 	local p = GameInfo.Policies.POLICY_LIBERTY
+	-- 	local _ = p.Description
+	-- 	_ = p.ID
+	-- 	_ = p.FreeBuildingOnConquest
+	-- 	_ = p.GridX
+	-- 	_ = p.GridY
+	-- 	_ = p.Type
+	-- end, "GameInfo column access")
 
 	PrintBenchmark(function()
 		local p = Gi.Policies.POLICY_LIBERTY --[[@as GiRow]]
@@ -240,6 +224,7 @@ CPK.DB.GiTest = function()
 		_ = p.FreeBuildingOnConquest
 		_ = p.GridX
 		_ = p.GridY
+		_ = p.Type
 	end, "Gi column access")
 
 	PrintBenchmark(function()

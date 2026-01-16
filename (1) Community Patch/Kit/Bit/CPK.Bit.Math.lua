@@ -6,7 +6,6 @@ local AssertIsInteger = CPK.Assert.IsInteger
 
 local LOG2 = lua_math_log(2)
 
-
 --- Compute the minimum number of bits required to encode `n` distinct values.
 --- @param n integer # Number of representable states (n >= 1)
 --- @return integer # Required bit width (>= 1)

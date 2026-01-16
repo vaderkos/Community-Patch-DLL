@@ -162,8 +162,8 @@
 	--- @param n integer
 	--- @return integer
 	function Polyfill.rol(a, n)
-		n       = n % 32
-		a       = to_u32(a)
+		n = n % 32
+		a = to_u32(a)
 		local l = (a * POW2[n]) % U32
 		local r = lua_math_floor(a / POW2[32 - n])
 		return to_s32((l + r) % U32)
@@ -173,8 +173,8 @@
 	--- @param n integer
 	--- @return integer
 	function Polyfill.ror(a, n)
-		n       = n % 32
-		a       = to_u32(a)
+		n = n % 32
+		a = to_u32(a)
 		local r = lua_math_floor(a / POW2[n])
 		local l = (a * POW2[32 - n]) % U32
 		return to_s32((l + r) % U32)

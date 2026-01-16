@@ -27,7 +27,7 @@ local WORD_BITS = 32
 ---   { name = 'E', bit_len = 4 },
 --- }
 ---
---- local slots = CPK.Bit.Layout.Assign32(cols)
+--- local slots = CPK.Bit.Layout.Assign32('col_pos', cols)
 ---
 --- -- Possible result (input order is mutated due to sorting):
 --- -- slot 1: C(16 bits at 0), A(10 bits at 16), B(6 bits at 26)
@@ -35,19 +35,22 @@ local WORD_BITS = 32
 ---
 --- -- cols now contains:
 --- -- {
---- --   { name='C', bit_len=16, slot=1, bit_pos=0  },
---- --   { name='A', bit_len=10, slot=1, bit_pos=16 },
---- --   { name='B', bit_len=6,  slot=1, bit_pos=26 },
---- --   { name='D', bit_len=8,  slot=2, bit_pos=0  },
---- --   { name='E', bit_len=4,  slot=2, bit_pos=8  },
+--- --   { name='C', bit_len=16, col_pos=1, bit_pos=0  },
+--- --   { name='A', bit_len=10, col_pos=1, bit_pos=16 },
+--- --   { name='B', bit_len=6,  col_pos=1, bit_pos=26 },
+--- --   { name='D', bit_len=8,  col_pos=2, bit_pos=0  },
+--- --   { name='E', bit_len=4,  col_pos=2, bit_pos=8  },
 --- --
 --- -- }
 --- ```
---- @param arr { name: string, bit_len: integer, [any]: any }[]
+--- @generic Key : string
+--- @param key Key
+--- @param arr { bit_len: integer, [any]: any }[]
 --- @return integer # Number of allocated 32-bit slots
---- @return { slot: integer, bit_pos: integer, name: string, bit_len: integer, [any]: any }[] # The same array reference, mutated in-place
-function BitLayout.Assign32(arr)
+--- @return { [Key]: integer, bit_pos: integer, bit_len: integer, [any]: any }[] # The same array reference, mutated in-place
+function BitLayout.Assign32(key, arr)
 	AssertIsTable(arr)
+	AssertIsString(key)
 
 	if #arr == 0 then
 		return 0, arr
@@ -57,11 +60,10 @@ function BitLayout.Assign32(arr)
 		local itm = arr[i]
 
 		AssertIsTable(itm)
-		AssertIsString(itm.name)
 		AssertIsInteger(itm.bit_len)
 
 		if itm.bit_len < 1 or itm.bit_len > 32 then
-			AssertError(itm.bit_len, '>=1 and <=32', 'Invalid ' .. itm.name .. ' at position ' .. i)
+			AssertError(itm.bit_len, '>=1 and <=32', 'Invalid at position ' .. i)
 		end
 	end
 
@@ -97,7 +99,7 @@ function BitLayout.Assign32(arr)
 			bins[#bins + 1] = best
 		end
 
-		itm.slot = best.slot
+		itm[key] = best.slot
 		itm.bit_pos = best.used
 		best.used = best.used + itm.bit_len
 
@@ -105,7 +107,7 @@ function BitLayout.Assign32(arr)
 			AssertError(
 				best.used,
 				'<=32',
-				'Word overflow after assigning ' .. itm.name .. ' at position ' .. i
+				'Word overflow after assigning at position ' .. i
 			)
 		end
 	end

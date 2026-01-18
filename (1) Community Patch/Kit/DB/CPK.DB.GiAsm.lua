@@ -119,34 +119,6 @@ local GI_COL_ENC_SPARSE = 6
 local GiAsm = {}
 
 function GiAsm.Assemble()
-	--- @param a unknown
-	--- @param b unknown
-	local gi_util_equals = function(a, b)
-		if a == b then return true end
-
-		if IsTable(a) ~= IsTable(b) then
-			return false
-		end
-
-		if not IsTable(a) then
-			return false
-		end
-
-		for k, v in lua_next, a do
-			if b[k] ~= v then
-				return false
-			end
-		end
-
-		for k in lua_next, b do
-			if a[k] == nil then
-				return false
-			end
-		end
-
-		return true
-	end
-
 	--- @param ... GiVal | table<number, GiVal>
 	--- @return string
 	local gi_util_varghash = function(...)

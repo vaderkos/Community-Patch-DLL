@@ -1,8 +1,9 @@
 local lua_next = next
+local lua_print = print
 local lua_xpcall = xpcall
 local lua_tostring = tostring
 local lua_os_clock = os.clock
-local lua_traceback = debug and debug.traceback or traceback
+local lua_debug_traceback = debug and debug.traceback or traceback
 
 local civ_table_fill = table.fill
 local lua_table_sort = table.sort
@@ -121,18 +122,18 @@ local bench = function(n, b, f)
 
 	left_prior = gc_run()
 
+	gc_pause()
 	for i = 1, size do
-		gc_pause()
 		time_prior, heap_prior = now(), gc_count()
 		for _ = 1, b do
 			f()
 		end
 		time_after, heap_after = now(), gc_count()
-		gc_start()
 
 		durs[i] = (time_after - time_prior) / b
 		mems[i] = (heap_after - heap_prior) / b
 	end
+	gc_start()
 
 	left_after = gc_run()
 
@@ -187,7 +188,7 @@ end
 
 --- @class GiTestOpts
 --- @field times? integer
---- @field tests table<string, fun(tbl: GiTbl): nil>
+--- @field tests table<string, fun(tbl: GiTbl): function>
 --- @field cases table<string, { delete: fun(tbl: GiTbl), create: fun(): GiTbl }>
 
 --- @param opts GiTestOpts
@@ -196,7 +197,7 @@ local function GiTest(opts)
 
 	local tests = opts.tests
 	local cases = opts.cases
-	local times = opts.times or (10 * 1000)
+	local times = opts.times or (3 * 1000)
 
 	AssertIsTable(tests)
 	AssertIsTable(cases)
@@ -219,7 +220,7 @@ local function GiTest(opts)
 			results[case_name][test_name] = {
 				dur = na(),
 				mem = na(),
-				ret = na(),
+				ret = 'N/A',
 			}
 		end
 	end
@@ -230,26 +231,31 @@ local function GiTest(opts)
 		local tbl = case_data.create()
 
 		for test_name, test_call in lua_next, tests do
-			local spec_info = results[case_name][test_name]
+			local test_info = results[case_name][test_name]
+			local test_test = test_call(tbl)
 
-			local data = bench(times, times / 100, function()
-				test_call(tbl)
-			end)
+			local succ, err = lua_xpcall(test_test, lua_debug_traceback)
 
-			local dur_min, dur_max, dur_avg, dur_med = stats(data.durs)
-			local mem_min, mem_max, mem_avg, mem_med = stats(data.mems)
+			if succ then
+				local ben_dat = bench(times, 100, test_test)
 
-			spec_info.dur.min = dur_min
-			spec_info.dur.max = dur_max
-			spec_info.dur.avg = dur_avg
-			spec_info.dur.med = dur_med
+				local dur_min, dur_max, dur_avg, dur_med = stats(ben_dat.durs)
+				local mem_min, mem_max, mem_avg, mem_med = stats(ben_dat.mems)
 
-			spec_info.mem.min = mem_min
-			spec_info.mem.max = mem_max
-			spec_info.mem.avg = mem_avg
-			spec_info.mem.med = mem_med
+				test_info.dur.min = dur_min
+				test_info.dur.max = dur_max
+				test_info.dur.avg = dur_avg
+				test_info.dur.med = dur_med
 
-			spec_info.ret = data.left
+				test_info.mem.min = mem_min
+				test_info.mem.max = mem_max
+				test_info.mem.avg = mem_avg
+				test_info.mem.med = mem_med
+
+				test_info.ret = ben_dat.left
+			else
+				lua_print('Skipping', case_name, test_name, err)
+			end
 
 			gc_run()
 		end
@@ -328,6 +334,8 @@ local function GiTest(opts)
 		return sb:Concat(' | ')
 	end)()
 
+	res:Append(sep):Append(top):Append(sep)
+
 	local last_test_name = nil
 	for i = 1, #rows do
 		local row = rows[i]
@@ -339,132 +347,115 @@ local function GiTest(opts)
 
 		local sb = StringBuilder.New()
 
-		for i = 1, #row do
-			sb:Append(pad_start(row[i], wids[i]))
+		for j = 1, #row do
+			sb:Append(pad_start(row[j], wids[j]))
 		end
 
 		res:Append(sb:Concat(' | '))
 		last_test_name = test_name
 	end
 
-	res:Append(sep)
-
-	print('\n' .. res:Prepend(sep):Prepend(top):Prepend(sep):Concat('\n'))
+	lua_print(lua_os_clock(), '\n' .. res:Append(sep):Concat('\n'))
 end
 
 CPK.DB.GiTest = GiTest
-
-local GameInfoLink = GameInfo
 
 GI_TEST_RUN = function()
 	GiTest({
 		tests = {
 			['Policies()'] = function(tbl)
-				for row in tbl.Policies() do end
+				return function()
+					for row in tbl.Policies() do end
+				end
 			end,
 			['Policies("ID < 100")'] = function(tbl)
-				for row in tbl.Policies('ID < 100') do end
+				return function()
+					for row in tbl.Policies('ID < 100') do end
+				end
 			end,
 			['Policies("PortraitIndex > 50")'] = function(tbl)
-				for row in tbl.Policies('PortraitIndex > 50') do end
+				return function()
+					for row in tbl.Policies('PortraitIndex > 50') do end
+				end
 			end,
 			['Policies({ CultureCost = 10 })'] = function(tbl)
-				for row in tbl.Policies({ CultureCost = 10 }) do end
+				return function()
+					for row in tbl.Policies({ CultureCost = 10 }) do end
+				end
 			end,
 			['Policies[0].Type'] = function(tbl)
-				return tbl.Policies[0].Type
+				local policy = tbl.Policies[0]
+
+				return function()
+					return policy.Type
+				end
+			end,
+			['Buildings("IconAtlas = \'BW_ATLAS_1\'")'] = function(tbl)
+				return function()
+					for row in tbl.Buildings("IconAtlas = 'BW_ATLAS_1'") do end
+				end
+			end,
+			['Buildings({ IsCorporation = 1 , GoldMaintenance = 1 })'] = function(tbl)
+				return function()
+					for row in tbl.Buildings({ IsCorporation = 1, GoldMaintenance = 1 }) do end
+				end
+			end,
+			['Buildings("ID IN (1, 2, 3, 4, 5, 6, 7, 8)")'] = function(tbl)
+				return function()
+					for row in tbl.Buildings('ID IN (1, 2, 3, 4, 5, 6, 7, 8)') do end
+				end
+			end,
+			['Buildings["BUILDING_GRANARY"]'] = function(tbl)
+				return function() return tbl["BUILDING_GRANARY"] end
+			end,
+			['Nested iteration'] = function(tbl)
+				return function()
+					for b in tbl.Buildings() do
+						if b.PrereqTech and b.PrereqTech ~= "" then
+							for u in tbl.Units({ PrereqTech = b.PrereqTech }) do
+								for r in tbl.Unit_FreePromotions({ UnitType = u.Type }) do
+									--
+								end
+							end
+						end
+					end
+				end
+			end,
+			['I wanna fail'] = function()
+				return function() error('I failed') end
 			end,
 		},
 		cases = {
-			GameInfo = {
-				create = function()
-					local tbl = GameInfoLink --[[@as GiTbl]]
+			-- Default GameInfo gets out of memory
+			-- GameInfo = {
+			-- 	create = function()
+			-- 		local tbl = GameInfo
 
-					local sql = [[
-						SELECT name FROM `sqlite_master`
-						WHERE type = 'table' AND name NOT LIKE 'sqlite%'
-					]]
+			-- 		local sql = [[
+			-- 			SELECT name FROM `sqlite_master`
+			-- 			WHERE type = 'table' AND name NOT LIKE 'sqlite%'
+			-- 		]]
 
-					for row in DB.Query(sql) do
-						for _ in tbl[row.name]() do end
-					end
+			-- 		for row in DB.Query(sql) do
+			-- 			for _ in tbl[row.name]() do end
+			-- 		end
 
-					return tbl
-				end,
-				delete = function() end
-			},
+			-- 		return tbl --[[@as GiTbl]]
+			-- 	end,
+			-- 	delete = function(tbl)
+			-- 		for name in lua_next, tbl do
+			-- 			tbl[name] = nil
+			-- 		end
+			-- 	end
+			-- },
 			Gi = {
 				create = function()
 					return CPK.DB.GiAsm.Assemble()
 				end,
-				delete = function()
-
+				delete = function(tbl)
+					return
 				end
 			}
 		}
 	})
 end
-
--- 	-- PrintBenchmark(function()
--- 	-- 	for row in GameInfo.Policies() do end
--- 	-- end, 'GameInfo.Policies()')
-
--- 	PrintBenchmark(function()
--- 		for row in Gi.Policies() do end
--- 	end, 'Gi.Policies()')
-
--- 	print('==== SQL Filters ====')
-
--- 	-- PrintBenchmark(function()
--- 	-- 	for row in GameInfo.Policies('PortraitIndex > 50') do end
--- 	-- end, "GameInfo.Policies(' PortraitIndex > 50 ')")
-
--- 	PrintBenchmark(function()
--- 		for row in Gi.Policies('PortraitIndex > 50') do end
--- 	end, "Gi.Policies(' PortraitIndex > 50 ')")
-
--- 	PrintBenchmark(function()
--- 		for row in Gi.Policies('PortraitIndex > ?', 50) do end
--- 	end, "Gi.Policies(' PortraitIndex > ? ', 50)")
-
--- 	print('==== Table Filters ====')
-
--- 	-- PrintBenchmark(function()
--- 	-- 	for row in GameInfo.Policies({ CultureCost = 10 }) do end
--- 	-- end, "GameInfo.Policies({ CultureCost = 10 })")
-
--- 	PrintBenchmark(function()
--- 		for row in Gi.Policies({ CultureCost = 10 }) do end
--- 	end, "Gi.Policies({ CultureCost = 10 })")
-
--- 	print('==== Row access ====')
-
--- 	-- PrintBenchmark(function()
--- 	-- 	local p = GameInfo.Policies.POLICY_LIBERTY
--- 	-- 	local _ = p.Description
--- 	-- 	_ = p.ID
--- 	-- 	_ = p.FreeBuildingOnConquest
--- 	-- 	_ = p.GridX
--- 	-- 	_ = p.GridY
--- 	-- 	_ = p.Type
--- 	-- end, "GameInfo column access")
-
--- 	PrintBenchmark(function()
--- 		local p = Gi.Policies.POLICY_LIBERTY --[[@as GiRow]]
--- 		local _ = p.Description
--- 		_ = p.ID
--- 		_ = p.FreeBuildingOnConquest
--- 		_ = p.GridX
--- 		_ = p.GridY
--- 		_ = p.Type
--- 	end, "Gi column access")
-
--- 	PrintBenchmark(function()
--- 		local _, _, _, _ = Gi.Policies.POLICY_LIBERTY(
--- 			'Description',
--- 			nil,
--- 			'missin',
--- 			'GridX'
--- 		)
--- 	end, "Gi column existence checks")
--- end

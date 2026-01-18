@@ -1464,30 +1464,28 @@ function GiAsm.Assemble()
 				local src = tbl_nmap or tbl_smap --[[@as table<number | string, GiRow> ]]
 				local sql = lua_string_format(tmp, tbl_nkey or tbl_skey, tbl_name, row_cond)
 				local nxt = civ_db_query(sql, ...)
-				local key, fnd, row, rkey_val = nil, nil, nil, nil
+				local row = nil
 
 				if tbl_nkey and tbl_nadj and tbl_nadj ~= 1 then
 					return function()
 						repeat
-							key, fnd = nxt()
+							row = nxt()
 
-							if not fnd then return nil end
+							if not row then return nil end
 
-							return src[fnd[1] - tbl_nadj + 1]
-						until key == nil
+							return src[row[1] - tbl_nadj + 1]
+						until row == nil
 					end
 				end
 
 				return function()
 					repeat
-						key, fnd = nxt()
+						row = nxt()
 
-						if not fnd then
-							return nil
-						end
+						if not row then return nil end
 
-						return src[fnd[1]]
-					until key == nil
+						return src[row[1]]
+					until row == nil
 				end
 			end
 

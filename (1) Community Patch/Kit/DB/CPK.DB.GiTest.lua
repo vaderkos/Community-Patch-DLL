@@ -23,6 +23,8 @@ local now = lua_os_clock
 
 local Bind = CPK.FP.Bind
 
+local IsNumber = CPK.Type.IsNumber
+
 local AssertError = CPK.Assert.Error
 local AssertIsTable = CPK.Assert.IsTable
 local AssertIsInteger = CPK.Assert.IsInteger
@@ -53,6 +55,10 @@ end
 --- @param digits? number
 --- @return string
 local format_mem = function(bytes, digits)
+	if not IsNumber(bytes) then
+		return bytes
+	end
+
 	digits = digits or 2
 	local abs = lua_math_abs(bytes)
 	local tmp = nil
@@ -72,6 +78,10 @@ local format_mem = function(bytes, digits)
 end
 
 local format_dur = function(dur, digits)
+	if not IsNumber(dur) then
+		return dur
+	end
+
 	digits = digits or 2
 
 	if dur == 0 then
